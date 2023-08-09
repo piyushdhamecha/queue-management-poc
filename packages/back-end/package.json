@@ -1,0 +1,30 @@
+{
+  "name": "back-end",
+  "version": "0.0.0",
+  "description": "> TODO: description",
+  "author": "Piyush <piyush@blossomeducational.com>",
+  "homepage": "",
+  "license": "ISC",
+  "main": "lib/back-end.js",
+  "directories": {
+    "lib": "lib",
+    "test": "__tests__"
+  },
+  "files": [
+    "lib"
+  ],
+  "scripts": {
+    "start": "nodemon index.js",
+    "inspect": "nodemon --inspect=9228 index.js",
+    "test": "echo \"Error: run tests from root\" && exit 1"
+  },
+  "dependencies": {
+    "amqplib": "^0.10.3",
+    "axios": "^1.4.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "nodemon": "^3.0.1",
+    "socket.io": "^4.7.2"
+  }
+}
