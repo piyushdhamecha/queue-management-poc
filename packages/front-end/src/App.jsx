@@ -10,6 +10,7 @@ import {
   Tr,
   Th,
   Td,
+  Select,
   TableContainer,
 } from "@chakra-ui/react";
 import axios from "axios";
@@ -17,30 +18,38 @@ import { useEffect } from "react";
 import { useState } from "react";
 import { socket } from "./socket";
 import { msToTime } from "./helpers";
+import { TOKENS } from "./constants";
 
 function App() {
   const toast = useToast();
-  const [userId, setUserId] = useState("user-1");
+  const [userId, setUserId] = useState("64d9b68bf11bd7f93b8381de");
   const [product, setProduct] = useState("geeky");
   const [messages, setMessages] = useState();
   const [isConnected, setIsConnected] = useState(socket.connected);
-  console.log({ messages });
+  console.log({ messages })
   useEffect(() => {
-    function onConnect() {
-      setIsConnected(true);
+    try {
+
+      function onConnect() {
+        setIsConnected(true);
+      }
+
+      function onDisconnect() {
+        setIsConnected(false);
+      }
+
+      // function onFooEvent(value) {
+      //   setFooEvents((previous) => [...previous, value]);
+      // }
+
+      socket.on("connect", onConnect);
+      socket.on("disconnect", onDisconnect);
+      socket.on('connect_error', err => console.error(err))
+      socket.on('connect_failed', err => console.error(err))
+      // socket.on("foo", onFooEvent);
+    } catch (error) {
+      console.log(error)
     }
-
-    function onDisconnect() {
-      setIsConnected(false);
-    }
-
-    // function onFooEvent(value) {
-    //   setFooEvents((previous) => [...previous, value]);
-    // }
-
-    socket.on("connect", onConnect);
-    socket.on("disconnect", onDisconnect);
-    // socket.on("foo", onFooEvent);
 
     return () => {
       socket.off("connect", onConnect);
@@ -51,7 +60,6 @@ function App() {
   }, []);
 
   const getFormattedMessages = (oldMessages, msg) => {
-    console.log({ msg });
     const { type, data } = msg;
 
     if (type === "timeData") {
@@ -60,6 +68,7 @@ function App() {
       return {
         ...oldMessages,
         [_id]: {
+          ...(oldMessages?.[_id] ? oldMessages[_id] : {}),
           status: "pending",
           estimatedTime,
           progress: 0,
@@ -71,7 +80,8 @@ function App() {
 
       return {
         ...oldMessages,
-        [_id]: {
+        [_id.$oid]: {
+          ...(oldMessages?.[_id.$oid] ? oldMessages[_id.$oid] : {}),
           status: percentage === 100 ? "completed" : "in-progress",
           estimatedTime: 0,
           percentage,
@@ -81,7 +91,7 @@ function App() {
 
     return oldMessages;
   };
-
+  console.log({ userId })
   useEffect(() => {
     if (isConnected) {
       socket.emit("join", {
@@ -101,20 +111,44 @@ function App() {
 
   const handleSendRequestClick = async () => {
     try {
-      const response = await axios.post("http://localhost:3050/send-request", {
-        userId,
-        product,
+      const { data } = await axios.post(`${import.meta.env.VITE_API_URL}/api/text-to-image`, {
+        prompt: "cat",
+        negativePrompt: " ",
+        imgArtStyle: "fine arts",
+        model: "stable_diffusion_xl",
+        scheduler: "DDIMScheduler",
+        width: 720,
+        height: 720,
+        numInferenceSteps: 50,
+        guidanceScale: 10,
+        manualSeed: 1,
+        denoisingEnd: 0.7,
+        strength: 0.3,
+      }, {
+        headers: {
+          Authorization: `Bearer ${TOKENS[userId]}`
+        }
       });
 
+      setMessages(prevMessages => ({
+        ...prevMessages,
+        [data.data.referenceId]: {
+          status: "pending",
+          estimatedTime: 0,
+          progress: 0,
+          sourceId: data.data._id
+        },
+      }))
+
       toast({
-        title: response.data.message,
+        title: 'Request sent successfully',
         status: "success",
         duration: 2000,
         isClosable: true,
       });
     } catch (error) {
       toast({
-        title: error.message,
+        title: error?.response?.data?.message || error?.message,
         status: "error",
         duration: 2000,
         isClosable: true,
@@ -130,13 +164,48 @@ function App() {
     }
   };
 
+  const handleCancelRequest = async (id, sourceId) => {
+    try {
+      await axios.put(`${import.meta.env.VITE_API_URL}/api/text-to-image/cancel-request/${sourceId}`, {}, {
+        headers: {
+          Authorization: `Bearer ${TOKENS[userId]}`
+        }
+      });
+
+      setMessages(prevMessages => {
+        const newMessages = { ...prevMessages }
+        delete newMessages[id]
+        return newMessages
+      })
+
+      toast({
+        title: 'Request cancelled successfully',
+        status: "success",
+        duration: 2000,
+        isClosable: true,
+      });
+    } catch (error) {
+      toast({
+        title: error.message,
+        status: "error",
+        duration: 2000,
+        isClosable: true,
+      });
+    }
+  }
+
   return (
     <Grid gap={3}>
-      <Input
+      {/* <Input
         type="text"
         value={userId}
         onChange={(e) => setUserId(e.target.value)}
-      />
+      /> */}
+      <Select placeholder='Select user' value={userId} onChange={e => setUserId(e.target.value)}>
+        <option value='64d9b68bf11bd7f93b8381de'>64d9b68bf11bd7f93b8381de</option>
+        <option value='64e59aed85dcc163735eaa77'>64e59aed85dcc163735eaa77</option>
+        <option value='64e59b0485dcc163735eaa7b'>64e59b0485dcc163735eaa7b</option>
+      </Select>
       <Input
         type="text"
         value={product}
@@ -161,6 +230,7 @@ function App() {
                 <Th>Status</Th>
                 <Th isNumeric>Estimated time</Th>
                 <Th isNumeric>Percentage</Th>
+                <Th />
               </Tr>
             </Thead>
             <Tbody>
@@ -178,6 +248,16 @@ function App() {
                       {messages[id].status === "pending"
                         ? "-"
                         : `${messages[id].percentage}%`}
+                    </Td>
+                    <Td>
+                      <Button
+                        disabled={messages[id].status !== "pending"}
+                        size="xs"
+                        variant='outline'
+                        onClick={() => handleCancelRequest(id, messages[id].sourceId)}
+                      >
+                        Cancel
+                      </Button>
                     </Td>
                   </Tr>
                 );

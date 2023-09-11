@@ -9,6 +9,12 @@
     "inspect": "lerna run inspect --stream",
     "dev": "lerna run dev --stream",
     "prod": "lerna run start-prod --stream",
-    "test": "lerna run test --stream"
+    "test": "lerna run test --stream",
+    "bootstrap": "lerna bootstrap",
+    "clean": "lerna clean",
+    "clean:build": "lerna exec -- rimraf lib",
+    "release": "lerna publish",
+    "ls": "lerna ls",
+    "install": "lerna bootstrap --hoist"
   }
 }
